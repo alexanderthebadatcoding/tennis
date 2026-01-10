@@ -21,9 +21,9 @@ function App() {
     setError(null);
 
     try {
-      // Fetch the list of leagues
+      // Fetch the list of leagues (using HTTPS)
       const leaguesResponse = await fetch(
-        "https://sports.core.api.espn.com/v2/sports/soccer/leagues?lang=en&region=us"
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/leagues"
       );
       const leaguesData = await leaguesResponse.json();
 
@@ -36,39 +36,13 @@ function App() {
       // Get first 26 leagues (items 0-25)
       const leagueItems = leaguesData.items.slice(0, 26);
 
-      // Fetch each league's details and events
-      const leaguePromises = leagueItems.map(async (item) => {
-        try {
-          const leagueRes = await fetch(item.$ref);
-          const leagueData = await leagueRes.json();
-
-          // Try to fetch events for this league
-          let events = [];
-          if (leagueData.calendarEndpoint) {
-            try {
-              const eventsRes = await fetch(leagueData.calendarEndpoint);
-              const eventsData = await eventsRes.json();
-              events = eventsData;
-            } catch (e) {
-              console.log(`No events for ${leagueData.name}`);
-            }
-          }
-
-          return {
-            id: leagueData.id,
-            name: leagueData.name,
-            abbreviation: leagueData.abbreviation,
-            slug: leagueData.slug,
-            events: events,
-          };
-        } catch (e) {
-          console.error("Error fetching league:", e);
-          return null;
-        }
-      });
-
-      const leaguesResults = await Promise.all(leaguePromises);
-      const validLeagues = leaguesResults.filter((l) => l !== null);
+      // Extract league info from the items
+      const validLeagues = leagueItems.map((league) => ({
+        id: league.id,
+        name: league.name,
+        abbreviation: league.abbreviation,
+        slug: league.slug,
+      }));
 
       setLeagues(validLeagues);
 
@@ -141,7 +115,7 @@ function App() {
 
   function isGameInTimeWindow(eventDate) {
     const date = new Date(eventDate);
-    // const now = new Date();
+    const now = new Date();
     const threeWeeksAgo = new Date();
     threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 4);
     const threeWeeksFromNow = new Date();
