@@ -21,104 +21,68 @@ function App() {
     setError(null);
 
     try {
-      // Fetch the list of leagues
-      const leaguesResponse = await fetch(
-        "https://sports.core.api.espn.com/v2/sports/soccer/leagues?lang=en&region=us"
-      );
-      const leaguesData = await leaguesResponse.json();
+      // 1️⃣ Fetch leagues (already trimmed server-side)
+      const leaguesRes = await fetch("/api/leagues");
+      if (!leaguesRes.ok) throw new Error("Failed to load leagues");
 
-      if (!leaguesData.items || leaguesData.items.length === 0) {
-        setError("No leagues found");
-        setLoading(false);
-        return;
+      const leagueItems = await leaguesRes.json();
+      if (!Array.isArray(leagueItems) || leagueItems.length === 0) {
+        throw new Error("No leagues found");
       }
 
-      // Get first 26 leagues (items 0-25)
-      const leagueItems = leaguesData.items.slice(0, 26);
-
-      // Fetch each league's details and events
-      const leaguePromises = leagueItems.map(async (item) => {
-        try {
-          const leagueRes = await fetch(item.$ref);
-          const leagueData = await leagueRes.json();
-
-          // Try to fetch events for this league
-          let events = [];
-          if (leagueData.calendarEndpoint) {
-            try {
-              const eventsRes = await fetch(leagueData.calendarEndpoint);
-              const eventsData = await eventsRes.json();
-              events = eventsData;
-            } catch (e) {
-              console.log(`No events for ${leagueData.name}`);
-            }
-          }
-
-          return {
-            id: leagueData.id,
-            name: leagueData.name,
-            abbreviation: leagueData.abbreviation,
-            slug: leagueData.slug,
-            events: events,
-          };
-        } catch (e) {
-          console.error("Error fetching league:", e);
-          return null;
-        }
-      });
-
-      const leaguesResults = await Promise.all(leaguePromises);
-      const validLeagues = leaguesResults.filter((l) => l !== null);
+      // Normalize league shape
+      const validLeagues = leagueItems.map((l) => ({
+        id: l.id,
+        name: l.name,
+        abbreviation: l.abbreviation,
+        slug: l.slug,
+      }));
 
       setLeagues(validLeagues);
 
-      // Now fetch scores for each league
-      const scoresData = {};
-      for (const league of validLeagues) {
-        try {
-          const scoresRes = await fetch(
-            `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.slug}/scoreboard`
-          );
-          const data = await scoresRes.json();
-          scoresData[league.id] = data.events || [];
-        } catch (e) {
-          console.log(`No scoreboard for ${league.name}`);
-          scoresData[league.id] = [];
-        }
-      }
+      // 2️⃣ Fetch all scoreboards in parallel
+      const scoresEntries = await Promise.all(
+        validLeagues.map(async (league) => {
+          try {
+            const res = await fetch(`/api/scoreboard/${league.slug}`);
+            if (!res.ok) throw new Error();
+            const events = await res.json();
+            return [league.id, Array.isArray(events) ? events : []];
+          } catch {
+            return [league.id, []];
+          }
+        })
+      );
 
+      const scoresData = Object.fromEntries(scoresEntries);
       setScores(scoresData);
 
-      // Fetch odds for live games
-      const oddsData = {};
-      for (const league of validLeagues) {
-        const leagueEvents = scoresData[league.id] || [];
-        for (const event of leagueEvents) {
-          // Only fetch odds for live games
-          if (event.status.type.state === "in") {
-            try {
-              const oddsUrl = `https://sports.core.api.espn.com/v2/sports/soccer/leagues/${league.slug}/events/${event.id}/competitions/${event.id}/odds`;
-              const oddsRes = await fetch(oddsUrl);
-              const oddsResult = await oddsRes.json();
+      // 3️⃣ Fetch odds ONLY for live games (parallel)
+      const liveEvents = validLeagues.flatMap((league) =>
+        (scoresData[league.id] || [])
+          .filter((e) => e.status?.type?.state === "in")
+          .map((e) => ({ league, event: e }))
+      );
 
-              if (oddsResult.items && oddsResult.items.length > 0) {
-                const oddsItem = oddsResult.items[0];
-                oddsData[event.id] = {
-                  home: oddsItem.homeTeamOdds?.current?.moneyLine?.american,
-                  away: oddsItem.awayTeamOdds?.current?.moneyLine?.american,
-                };
-              }
-            } catch (e) {
-              console.log(`No odds for event ${event.id}`);
-            }
+      const oddsEntries = await Promise.all(
+        liveEvents.map(async ({ league, event }) => {
+          try {
+            const res = await fetch(`/api/odds/${league.slug}/${event.id}`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            return data ? [event.id, data] : null;
+          } catch {
+            return null;
           }
-        }
-      }
+        })
+      );
+
+      const oddsData = Object.fromEntries(oddsEntries.filter(Boolean));
 
       setOdds(oddsData);
-      setLoading(false);
     } catch (err) {
-      setError("Failed to fetch data: " + err.message);
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
+    } finally {
       setLoading(false);
     }
   };
