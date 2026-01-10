@@ -23,7 +23,7 @@ function App() {
     try {
       // Fetch the list of leagues (using HTTPS)
       const leaguesResponse = await fetch(
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/leagues"
+        "https://sports.core.api.espn.com/v2/sports/soccer/leagues/"
       );
       const leaguesData = await leaguesResponse.json();
 
@@ -51,7 +51,7 @@ function App() {
       for (const league of validLeagues) {
         try {
           const scoresRes = await fetch(
-            `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.slug}/scoreboard`
+            `https://sports.core.api.espn.com/v2/sports/soccer/${league.slug}/scoreboard`
           );
           const data = await scoresRes.json();
           scoresData[league.id] = data.events || [];
