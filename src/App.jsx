@@ -53,24 +53,24 @@ function App() {
       const scoresData = Object.fromEntries(scoresPairs);
       setScores(scoresData);
 
-      /* ---------- ODDS (LIVE ONLY) ---------- */
-      const liveEvents = [];
-
+      /* ---------- ODDS (ALL EVENTS) ---------- */
+      const allEvents = [];
       for (const league of validLeagues) {
         for (const event of scoresData[league.id] || []) {
-          if (event?.status?.type?.state === "in") {
-            liveEvents.push({ league, event });
-          }
+          allEvents.push({ league, event });
         }
       }
+      console.log(`Fetching odds for ${allEvents.length} events`);
 
       const oddsPairs = await Promise.all(
-        liveEvents.map(async ({ league, event }) => {
+        allEvents.map(async ({ league, event }) => {
           try {
             const res = await fetch(`/api/odds/${league.slug}/${event.id}`);
             const data = await res.json();
+            console.log(`Odds for event ${event.id}:`, data);
             return data ? [event.id, data] : null;
-          } catch {
+          } catch (error) {
+            console.error(`Failed to fetch odds for event ${event.id}:`, error);
             return null;
           }
         })

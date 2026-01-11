@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       return res.status(200).json(null);
     }
 
-    const o = data.items[2]; // Changed from 0 to 2
+    const o = data.items[1]; // Changed from 0 to 1 to get moneyline odds
 
     return res.status(200).json({
       home: o.homeTeamOdds?.current?.moneyLine?.american ?? null,
