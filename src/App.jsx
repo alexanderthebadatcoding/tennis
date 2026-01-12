@@ -60,17 +60,54 @@ function App() {
           allEvents.push({ league, event });
         }
       }
-      console.log(`Fetching odds for ${allEvents.length} events`);
+      // console.log(`Fetching odds for ${allEvents.length} events`);
 
       const oddsPairs = await Promise.all(
         allEvents.map(async ({ league, event }) => {
           try {
             const res = await fetch(`/api/odds/${league.slug}/${event.id}`);
             const data = await res.json();
-            console.log(`Odds for event ${event.id}:`, data);
-            return data ? [event.id, data] : null;
+
+            // If API returns valid odds, use them
+            if (data && (data.home !== null || data.away !== null)) {
+              console.log(`Odds for event ${event.id}:`, data);
+              return [event.id, data];
+            }
+
+            // Fallback: extract from scoreboard data
+            console.log(`Using fallback odds for event ${event.id}`);
+            const competition = event?.competitions?.[0];
+            const moneyline = competition?.odds?.[0]?.moneyline;
+
+            if (moneyline) {
+              const fallbackOdds = {
+                home: moneyline.home?.open?.odds ?? null,
+                away: moneyline.away?.open?.odds ?? null,
+              };
+              console.log(`Fallback odds for event ${event.id}:`, fallbackOdds);
+              return [event.id, fallbackOdds];
+            }
+
+            return null;
           } catch (error) {
             console.error(`Failed to fetch odds for event ${event.id}:`, error);
+
+            // Fallback: extract from scoreboard data
+            const competition = event?.competitions?.[0];
+            const moneyline = competition?.odds?.[0]?.moneyline;
+
+            if (moneyline) {
+              const fallbackOdds = {
+                home: moneyline.home?.open?.odds ?? null,
+                away: moneyline.away?.open?.odds ?? null,
+              };
+              console.log(
+                `Fallback odds for event ${event.id} (error):`,
+                fallbackOdds
+              );
+              return [event.id, fallbackOdds];
+            }
+
             return null;
           }
         })
