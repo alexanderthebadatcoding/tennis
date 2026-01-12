@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       return res.status(200).json(null);
     }
 
-    const o = data.items.length >= 3 ? data.items[2] : data.items[0];
+    const o = data.items.length >= 3 ? data.items[2] : data.items[1];
     console.log("Using item at index:", data.items.length >= 3 ? 2 : 0);
     console.log("Item data:", JSON.stringify(o, null, 2));
 
