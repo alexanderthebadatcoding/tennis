@@ -3,7 +3,7 @@ export default async function handler(req, res) {
 
   try {
     const r = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`
+      `https://site.api.espn.com/apis/site/v2/sports/tennis/${slug}/scoreboard`
     );
     const data = await r.json();
 

@@ -189,7 +189,7 @@ function App() {
           <div className="flex items-center justify-center gap-3 mb-2">
             <Trophy className="w-10 h-10 text-green-600" />
             <h1 className="text-4xl font-bold text-gray-800">
-              Soccer Scoreboard
+              Tennis Scoreboard
             </h1>
           </div>
           <p className="text-gray-600">
@@ -272,6 +272,7 @@ function App() {
                                 <Clock className="w-4 h-4 ml-2" />
                                 {formatTime(event.date)}
                               </div>
+                              <p> {event.name}</p>
                               <span
                                 className={`px-3 py-1 rounded-full text-sm font-semibold ${
                                   event.status.type.state === "post"

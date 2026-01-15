@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   console.log("API called with:", { league, eventId });
 
   try {
-    const url = `https://sports.core.api.espn.com/v2/sports/soccer/leagues/${league}/events/${eventId}/competitions/${eventId}/odds`;
+    const url = `https://sports.core.api.espn.com/v2/sports/tennis/leagues/${league}/events/${eventId}/competitions/${eventId}/odds`;
     console.log("Fetching from:", url);
 
     const r = await fetch(url);

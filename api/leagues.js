@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   try {
     const listRes = await fetch(
-      "https://sports.core.api.espn.com/v2/sports/soccer/leagues?lang=en&region=us"
+      "https://sports.core.api.espn.com/v2/sports/tennis/leagues?lang=en&region=us"
     );
     const listData = await listRes.json();
 
