@@ -287,59 +287,60 @@ function App() {
                             </div>
 
                             <div className="space-y-2">
-                              {event.competitions[0].competitors.map((team) => {
-                                const isHome = team.homeAway === "home";
-                                const teamOdds = odds[event.id];
-                                const oddsValue = teamOdds
-                                  ? isHome
-                                    ? teamOdds.home
-                                    : teamOdds.away
-                                  : null;
-                                const oddsPercentage =
-                                  americanOddsToPercentage(oddsValue);
+                              {event.groupings?.[0]?.competitions?.[0]?.competitors?.map(
+                                (competitor) => {
+                                  const isHome = competitor.homeAway === "home";
+                                  const teamOdds = odds[event.id];
+                                  const oddsValue = teamOdds
+                                    ? isHome
+                                      ? teamOdds.home
+                                      : teamOdds.away
+                                    : null;
+                                  const oddsPercentage =
+                                    americanOddsToPercentage(oddsValue);
 
-                                return (
-                                  <div
-                                    key={team.id}
-                                    className="flex items-center justify-between"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      {team.team.logo && (
-                                        <img
-                                          src={team.team.logo}
-                                          alt={team.team.name}
-                                          className="w-8 h-8 object-contain"
-                                          loading="lazy"
-                                        />
-                                      )}
+                                  return (
+                                    <div
+                                      key={competitor.id}
+                                      className="flex items-center justify-between"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        {competitor.athlete?.headshot && (
+                                          <img
+                                            src={competitor.athlete.headshot}
+                                            alt={competitor.athlete.displayName}
+                                            className="w-8 h-8 object-contain rounded-full"
+                                            loading="lazy"
+                                          />
+                                        )}
+                                        <span
+                                          className={`font-semibold ${
+                                            competitor.winner
+                                              ? "text-green-700"
+                                              : "text-gray-700"
+                                          }`}
+                                        >
+                                          {competitor.athlete?.displayName}
+                                        </span>
+                                        {oddsPercentage && (
+                                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                            {oddsPercentage}
+                                          </span>
+                                        )}
+                                      </div>
                                       <span
-                                        className={`font-semibold ${
-                                          team.winner
+                                        className={`text-2xl font-bold ${
+                                          competitor.winner
                                             ? "text-green-700"
                                             : "text-gray-700"
                                         }`}
                                       >
-                                        {team.team.abbreviation ||
-                                          team.team.name}
+                                        {competitor.score}
                                       </span>
-                                      {oddsPercentage && (
-                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                          {oddsPercentage}
-                                        </span>
-                                      )}
                                     </div>
-                                    <span
-                                      className={`text-2xl font-bold ${
-                                        team.winner
-                                          ? "text-green-700"
-                                          : "text-gray-700"
-                                      }`}
-                                    >
-                                      {team.score}
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                }
+                              )}
                             </div>
                           </div>
                         ))}
