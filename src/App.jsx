@@ -42,7 +42,9 @@ function App() {
         validLeagues.map(async (league) => {
           try {
             const res = await fetch(`/api/scoreboard/${league.slug}`);
-            const events = await res.json();
+            const data = await res.json();
+            // Handle tennis API structure with events array
+            const events = data?.events || [];
             return [league.id, Array.isArray(events) ? events : []];
           } catch {
             return [league.id, []];
@@ -60,7 +62,6 @@ function App() {
           allEvents.push({ league, event });
         }
       }
-      // console.log(`Fetching odds for ${allEvents.length} events`);
 
       const oddsPairs = await Promise.all(
         allEvents.map(async ({ league, event }) => {
@@ -68,15 +69,15 @@ function App() {
             const res = await fetch(`/api/odds/${league.slug}/${event.id}`);
             const data = await res.json();
 
-            // If API returns valid odds, use them
             if (data && (data.home !== null || data.away !== null)) {
               console.log(`Odds for event ${event.id}:`, data);
               return [event.id, data];
             }
 
-            // Fallback: extract from scoreboard data
+            // Fallback: extract from tennis API structure
             console.log(`Using fallback odds for event ${event.id}`);
-            const competition = event?.competitions?.[0];
+            const grouping = event?.groupings?.[0];
+            const competition = grouping?.competitions?.[0];
             const moneyline = competition?.odds?.[0]?.moneyline;
 
             if (moneyline) {
@@ -92,8 +93,9 @@ function App() {
           } catch (error) {
             console.error(`Failed to fetch odds for event ${event.id}:`, error);
 
-            // Fallback: extract from scoreboard data
-            const competition = event?.competitions?.[0];
+            // Fallback: extract from tennis API structure
+            const grouping = event?.groupings?.[0];
+            const competition = grouping?.competitions?.[0];
             const moneyline = competition?.odds?.[0]?.moneyline;
 
             if (moneyline) {
@@ -179,7 +181,7 @@ function App() {
       </div>
     );
   }
-  console.log("Leagues:", leagues);
+
   /* ---------- RENDER ---------- */
 
   return (
@@ -214,7 +216,7 @@ function App() {
               if (filteredEvents.length === 0) return null;
 
               const hasLiveGames = filteredEvents.some(
-                (e) => e.status.type.state === "in"
+                (e) => e.status?.type?.state === "in"
               );
 
               return { league, filteredEvents, hasLiveGames };
@@ -272,110 +274,103 @@ function App() {
                                 <Clock className="w-4 h-4 ml-2" />
                                 {formatTime(event.date)}
                               </div>
-                              <p> {event.name}</p>
+                              <p className="text-sm font-medium text-gray-700">
+                                {event.shortName || event.name}
+                              </p>
                               <span
                                 className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                  event.status.type.state === "post"
+                                  event.status?.type?.state === "post"
                                     ? "bg-gray-200 text-gray-700"
-                                    : event.status.type.state === "in"
+                                    : event.status?.type?.state === "in"
                                     ? "bg-red-100 text-red-700"
                                     : "bg-blue-100 text-blue-700"
                                 }`}
                               >
-                                {event.status.type.shortDetail}
+                                {event.status?.type?.shortDetail || "Scheduled"}
                               </span>
                             </div>
 
-                            {events?.map((event) => (
-                              <div key={event.id} className="mb-6">
-                                {/* Optional: Display event name */}
-                                {event.shortName && (
-                                  <h3 className="font-semibold mb-2">
-                                    {event.shortName}
-                                  </h3>
+                            {/* Tennis matches - iterate through groupings */}
+                            {event.groupings?.map((grouping, groupingIndex) => (
+                              <div key={groupingIndex} className="mt-4">
+                                {grouping.grouping?.displayName && (
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {grouping.grouping.displayName}
+                                  </p>
                                 )}
 
-                                {event.groupings?.map(
-                                  (grouping, groupingIndex) => (
-                                    <div
-                                      key={groupingIndex}
-                                      className="space-y-2 mb-4"
-                                    >
-                                      {/* Optional: Display grouping name */}
-                                      {grouping.grouping?.displayName && (
-                                        <p className="text-sm text-gray-600">
-                                          {grouping.grouping.displayName}
-                                        </p>
-                                      )}
+                                {/* Round info */}
+                                {grouping.competitions?.[0]?.round
+                                  ?.displayName && (
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {grouping.competitions[0].round.displayName}
+                                  </p>
+                                )}
 
-                                      {grouping.competitions?.[0]?.competitors?.map(
-                                        (competitor) => {
-                                          const isHome =
-                                            competitor.homeAway === "home";
-                                          const teamOdds = odds[event.id];
-                                          const oddsValue = teamOdds
-                                            ? isHome
-                                              ? teamOdds.home
-                                              : teamOdds.away
-                                            : null;
-                                          const oddsPercentage =
-                                            americanOddsToPercentage(oddsValue);
+                                {/* Players/Competitors */}
+                                <div className="space-y-2">
+                                  {grouping.competitions?.[0]?.competitors?.map(
+                                    (competitor) => {
+                                      const isHome =
+                                        competitor.homeAway === "home";
+                                      const teamOdds = odds[event.id];
+                                      const oddsValue = teamOdds
+                                        ? isHome
+                                          ? teamOdds.home
+                                          : teamOdds.away
+                                        : null;
+                                      const oddsPercentage =
+                                        americanOddsToPercentage(oddsValue);
 
-                                          return (
-                                            <div
-                                              key={competitor.id}
-                                              className="flex items-center justify-between"
+                                      return (
+                                        <div
+                                          key={competitor.id}
+                                          className="flex items-center justify-between"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            {competitor.athlete?.headshot && (
+                                              <img
+                                                src={
+                                                  competitor.athlete.headshot
+                                                }
+                                                alt={
+                                                  competitor.athlete
+                                                    ?.displayName
+                                                }
+                                                className="w-8 h-8 object-contain rounded-full"
+                                                loading="lazy"
+                                              />
+                                            )}
+                                            <span
+                                              className={`font-semibold ${
+                                                competitor.winner
+                                                  ? "text-green-700"
+                                                  : "text-gray-700"
+                                              }`}
                                             >
-                                              <div className="flex items-center gap-3">
-                                                {competitor.athlete
-                                                  ?.headshot && (
-                                                  <img
-                                                    src={
-                                                      competitor.athlete
-                                                        .headshot
-                                                    }
-                                                    alt={
-                                                      competitor.athlete
-                                                        .displayName
-                                                    }
-                                                    className="w-8 h-8 object-contain rounded-full"
-                                                    loading="lazy"
-                                                  />
-                                                )}
-                                                <span
-                                                  className={`font-semibold ${
-                                                    competitor.winner
-                                                      ? "text-green-700"
-                                                      : "text-gray-700"
-                                                  }`}
-                                                >
-                                                  {
-                                                    competitor.athlete
-                                                      ?.displayName
-                                                  }
-                                                </span>
-                                                {oddsPercentage && (
-                                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                    {oddsPercentage}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <span
-                                                className={`text-2xl font-bold ${
-                                                  competitor.winner
-                                                    ? "text-green-700"
-                                                    : "text-gray-700"
-                                                }`}
-                                              >
-                                                {competitor.score}
+                                              {competitor.athlete
+                                                ?.displayName || "Unknown"}
+                                            </span>
+                                            {oddsPercentage && (
+                                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                {oddsPercentage}
                                               </span>
-                                            </div>
-                                          );
-                                        }
-                                      )}
-                                    </div>
-                                  )
-                                )}
+                                            )}
+                                          </div>
+                                          <span
+                                            className={`text-2xl font-bold ${
+                                              competitor.winner
+                                                ? "text-green-700"
+                                                : "text-gray-700"
+                                            }`}
+                                          >
+                                            {competitor.score || "-"}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
