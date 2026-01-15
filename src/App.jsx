@@ -33,7 +33,7 @@ function App() {
         name: l.name,
         abbreviation: l.abbreviation,
         slug: l.slug,
-        logo: l.logo, // optional
+        logo: l.logo,
       }));
       setLeagues(validLeagues);
 
@@ -43,7 +43,8 @@ function App() {
           try {
             const res = await fetch(`/api/scoreboard/${league.slug}`);
             const data = await res.json();
-            const events = data?.events || [];
+            // Accept either { events: [...] } or an array directly (compat)
+            const events = Array.isArray(data) ? data : data?.events || [];
             return [league.id, Array.isArray(events) ? events : []];
           } catch {
             return [league.id, []];
@@ -53,7 +54,7 @@ function App() {
       const scoresData = Object.fromEntries(scoresPairs);
       setScores(scoresData);
 
-      // ODDS: fetch per competition (tennis competitions are inside event.groupings[*].competitions[*])
+      // ODDS: fetch per competition
       const allCompetitions = [];
       for (const league of validLeagues) {
         const leagueEvents = scoresData[league.id] || [];
@@ -62,9 +63,12 @@ function App() {
           for (const grouping of groupings) {
             const competitions = grouping.competitions || [];
             for (const competition of competitions) {
-              // competitions have distinct ids we can use to fetch odds
               allCompetitions.push({ league, event, competition });
             }
+          }
+          // also check event-level competitions if present
+          for (const competition of event.competitions || []) {
+            allCompetitions.push({ league, event, competition });
           }
         }
       }
@@ -77,12 +81,10 @@ function App() {
             );
             const data = await res.json();
 
-            // If the API returns sensible home/away fields use them
             if (data && (data.home !== null || data.away !== null)) {
               return [competition.id, data];
             }
 
-            // Fallback: competition.odds -> moneyline structure
             const moneyline = competition?.odds?.[0]?.moneyline;
             if (moneyline) {
               const fallback = {
@@ -156,6 +158,56 @@ function App() {
     return `${(p * 100).toFixed(1)}%`;
   };
 
+  // Extract broadcast/network names from various shapes
+  const getBroadcastNames = (competition, event) => {
+    const raw =
+      competition?.broadcasts ||
+      competition?.broadcast ||
+      event?.broadcasts ||
+      event?.broadcast ||
+      null;
+
+    if (!raw) return [];
+
+    if (Array.isArray(raw)) {
+      // array of objects or strings
+      return raw
+        .map((r) => {
+          if (!r) return null;
+          if (typeof r === "string") return r;
+          // ESPN-like shape: { name, shortName, network, callLetters, market }
+          return (
+            r.name ||
+            r.shortName ||
+            r.network ||
+            r.callLetters ||
+            r.market ||
+            null
+          );
+        })
+        .filter(Boolean);
+    }
+
+    if (typeof raw === "object") {
+      // object may have names array or single name/network
+      if (Array.isArray(raw.names)) {
+        return raw.names.filter(Boolean);
+      }
+      return [
+        raw.name ||
+          raw.shortName ||
+          raw.network ||
+          raw.callLetters ||
+          raw.market,
+      ].filter(Boolean);
+    }
+
+    // fallback: raw as string
+    if (typeof raw === "string") return [raw];
+
+    return [];
+  };
+
   const toggleLeague = (id) => {
     setCollapsedLeagues((p) => ({ ...p, [id]: !p[id] }));
   };
@@ -173,20 +225,17 @@ function App() {
     });
   };
 
-  // Build a mapping of groupingKey -> { displayName, competitions: [ { event, competition } ] }
+  // Build a mapping of groupingKey -> { displayName, items: [ { event, competition } ] }
   const buildGroupingsForLeague = (leagueEvents = []) => {
     const map = new Map();
     for (const event of leagueEvents) {
-      // Skip out-of-window events
       if (!isGameInTimeWindow(event.date)) continue;
 
       const groupings = event.groupings || [];
       if (groupings.length === 0) {
-        // Put event into an "Ungrouped" bucket
         const key = "Ungrouped";
         if (!map.has(key))
           map.set(key, { displayName: "Ungrouped", items: [] });
-        // Some tennis providers put competitions under event directly; handle both
         const competitions = event.competitions || [];
         if (competitions.length > 0) {
           for (const comp of competitions) {
@@ -199,6 +248,7 @@ function App() {
               id: event.id,
               competitors: event.competitors || [],
               odds: event.odds || [],
+              broadcast: event.broadcast || event.broadcasts,
             },
           });
         }
@@ -217,13 +267,17 @@ function App() {
               map.get(key).items.push({ event, competition: comp });
             }
           } else {
-            // If no competitions array, fallback to event-level competitors
             map.get(key).items.push({
               event,
               competition: {
                 id: event.id,
                 competitors: event.competitors || [],
                 odds: event.odds || [],
+                broadcast:
+                  grouping.broadcast ||
+                  grouping.broadcasts ||
+                  event.broadcast ||
+                  event.broadcasts,
               },
             });
           }
@@ -376,6 +430,11 @@ function App() {
                                       ? "Live"
                                       : "Scheduled");
                                   const compOdds = odds[compId];
+                                  const broadcasts = getBroadcastNames(
+                                    competition,
+                                    event
+                                  );
+
                                   return (
                                     <div
                                       key={compId}
@@ -392,12 +451,28 @@ function App() {
                                             ? formatTime(compDate)
                                             : formatTime(event.date)}
                                         </div>
-                                        <p className="text-sm font-medium text-gray-700">
-                                          {competition.shortName ||
-                                            competition.name ||
-                                            event.shortName ||
-                                            event.name}
-                                        </p>
+                                        <div className="flex flex-col items-end">
+                                          <p className="text-sm font-medium text-gray-700">
+                                            {competition.shortName ||
+                                              competition.name ||
+                                              event.shortName ||
+                                              event.name}
+                                          </p>
+                                          {/* Broadcast badges (if any) */}
+                                          {broadcasts.length > 0 && (
+                                            <div className="flex gap-2 mt-1">
+                                              {broadcasts.map((b, i) => (
+                                                <span
+                                                  key={i}
+                                                  className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded"
+                                                >
+                                                  {b}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+
                                         <span
                                           className={`px-3 py-1 rounded-full text-sm font-semibold ${
                                             statusState === "post"
@@ -427,6 +502,18 @@ function App() {
                                             : null;
                                           const oddsPercentage =
                                             americanOddsToPercentage(oddsValue);
+
+                                          // Ensure linescores exist at competitor.linescores (array of { value, winner })
+                                          const linescores = Array.isArray(
+                                            competitor.linescores
+                                          )
+                                            ? competitor.linescores
+                                            : Array.isArray(
+                                                competitor.linescore
+                                              )
+                                            ? competitor.linescore
+                                            : [];
+
                                           return (
                                             <div
                                               key={competitor.id}
@@ -448,24 +535,54 @@ function App() {
                                                     loading="lazy"
                                                   />
                                                 )}
-                                                <span
-                                                  className={`font-semibold ${
-                                                    competitor.winner
-                                                      ? "text-green-700"
-                                                      : "text-gray-700"
-                                                  }`}
-                                                >
-                                                  {competitor.athlete
-                                                    ?.displayName ||
-                                                    competitor.name ||
-                                                    "Unknown"}
-                                                </span>
-                                                {oddsPercentage && (
-                                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                    {oddsPercentage}
+                                                <div className="flex items-center gap-3">
+                                                  <span
+                                                    className={`font-semibold ${
+                                                      competitor.winner
+                                                        ? "text-green-700"
+                                                        : "text-gray-700"
+                                                    }`}
+                                                  >
+                                                    {competitor.athlete
+                                                      ?.displayName ||
+                                                      competitor.name ||
+                                                      "Unknown"}
                                                   </span>
-                                                )}
+
+                                                  {/* Linescores: display each set/game score as a badge, highlight winner sets */}
+                                                  {linescores.length > 0 && (
+                                                    <div className="flex items-center gap-1 ml-2">
+                                                      {linescores.map(
+                                                        (ls, idx) => {
+                                                          const value =
+                                                            ls?.value ?? "-";
+                                                          const won =
+                                                            !!ls?.winner;
+                                                          return (
+                                                            <span
+                                                              key={idx}
+                                                              className={`text-xs px-2 py-1 rounded ${
+                                                                won
+                                                                  ? "bg-green-200 text-green-800"
+                                                                  : "bg-gray-100 text-gray-700"
+                                                              }`}
+                                                            >
+                                                              {value}
+                                                            </span>
+                                                          );
+                                                        }
+                                                      )}
+                                                    </div>
+                                                  )}
+
+                                                  {oddsPercentage && (
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                      {oddsPercentage}
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
+
                                               <span
                                                 className={`text-2xl font-bold ${
                                                   competitor.winner
