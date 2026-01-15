@@ -7,8 +7,9 @@ export default async function handler(req, res) {
     );
     const data = await r.json();
 
-    res.status(200).json(data.events || []);
+    // Return an object with `events` so the frontend `data?.events` works
+    res.status(200).json({ events: data.events || [] });
   } catch {
-    res.status(200).json([]);
+    res.status(200).json({ events: [] });
   }
 }
