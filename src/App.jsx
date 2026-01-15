@@ -286,62 +286,98 @@ function App() {
                               </span>
                             </div>
 
-                            <div className="space-y-2">
-                              {event.groupings?.[0]?.competitions?.[0]?.competitors?.map(
-                                (competitor) => {
-                                  const isHome = competitor.homeAway === "home";
-                                  const teamOdds = odds[event.id];
-                                  const oddsValue = teamOdds
-                                    ? isHome
-                                      ? teamOdds.home
-                                      : teamOdds.away
-                                    : null;
-                                  const oddsPercentage =
-                                    americanOddsToPercentage(oddsValue);
+                            {events?.map((event) => (
+                              <div key={event.id} className="mb-6">
+                                {/* Optional: Display event name */}
+                                {event.shortName && (
+                                  <h3 className="font-semibold mb-2">
+                                    {event.shortName}
+                                  </h3>
+                                )}
 
-                                  return (
+                                {event.groupings?.map(
+                                  (grouping, groupingIndex) => (
                                     <div
-                                      key={competitor.id}
-                                      className="flex items-center justify-between"
+                                      key={groupingIndex}
+                                      className="space-y-2 mb-4"
                                     >
-                                      <div className="flex items-center gap-3">
-                                        {competitor.athlete?.headshot && (
-                                          <img
-                                            src={competitor.athlete.headshot}
-                                            alt={competitor.athlete.displayName}
-                                            className="w-8 h-8 object-contain rounded-full"
-                                            loading="lazy"
-                                          />
-                                        )}
-                                        <span
-                                          className={`font-semibold ${
-                                            competitor.winner
-                                              ? "text-green-700"
-                                              : "text-gray-700"
-                                          }`}
-                                        >
-                                          {competitor.athlete?.displayName}
-                                        </span>
-                                        {oddsPercentage && (
-                                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                            {oddsPercentage}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span
-                                        className={`text-2xl font-bold ${
-                                          competitor.winner
-                                            ? "text-green-700"
-                                            : "text-gray-700"
-                                        }`}
-                                      >
-                                        {competitor.score}
-                                      </span>
+                                      {/* Optional: Display grouping name */}
+                                      {grouping.grouping?.displayName && (
+                                        <p className="text-sm text-gray-600">
+                                          {grouping.grouping.displayName}
+                                        </p>
+                                      )}
+
+                                      {grouping.competitions?.[0]?.competitors?.map(
+                                        (competitor) => {
+                                          const isHome =
+                                            competitor.homeAway === "home";
+                                          const teamOdds = odds[event.id];
+                                          const oddsValue = teamOdds
+                                            ? isHome
+                                              ? teamOdds.home
+                                              : teamOdds.away
+                                            : null;
+                                          const oddsPercentage =
+                                            americanOddsToPercentage(oddsValue);
+
+                                          return (
+                                            <div
+                                              key={competitor.id}
+                                              className="flex items-center justify-between"
+                                            >
+                                              <div className="flex items-center gap-3">
+                                                {competitor.athlete
+                                                  ?.headshot && (
+                                                  <img
+                                                    src={
+                                                      competitor.athlete
+                                                        .headshot
+                                                    }
+                                                    alt={
+                                                      competitor.athlete
+                                                        .displayName
+                                                    }
+                                                    className="w-8 h-8 object-contain rounded-full"
+                                                    loading="lazy"
+                                                  />
+                                                )}
+                                                <span
+                                                  className={`font-semibold ${
+                                                    competitor.winner
+                                                      ? "text-green-700"
+                                                      : "text-gray-700"
+                                                  }`}
+                                                >
+                                                  {
+                                                    competitor.athlete
+                                                      ?.displayName
+                                                  }
+                                                </span>
+                                                {oddsPercentage && (
+                                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                    {oddsPercentage}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span
+                                                className={`text-2xl font-bold ${
+                                                  competitor.winner
+                                                    ? "text-green-700"
+                                                    : "text-gray-700"
+                                                }`}
+                                              >
+                                                {competitor.score}
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+                                      )}
                                     </div>
-                                  );
-                                }
-                              )}
-                            </div>
+                                  )
+                                )}
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
